@@ -18,6 +18,7 @@ class Orden extends Model
         'equipo_id', 'cliente_id', 'estado_id',
         'fecha_ingreso', 'fecha_terminado', 'fecha_retirado',
         'trabajo_solicitado', 'accesorios', 'trabajo_realizado', 'detalles',
+        'costo_mano_obra', 'costo_repuestos',
         'created_by', 'updated_by',
     ];
 
@@ -25,7 +26,14 @@ class Orden extends Model
         'fecha_ingreso'   => 'date',
         'fecha_terminado' => 'date',
         'fecha_retirado'  => 'date',
+        'costo_mano_obra' => 'decimal:2',
+        'costo_repuestos' => 'decimal:2',
     ];
+
+    public function getCostoTotalAttribute(): float
+    {
+        return (float) $this->costo_mano_obra + (float) $this->costo_repuestos;
+    }
 
     public function equipo(): BelongsTo
     {

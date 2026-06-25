@@ -11,18 +11,59 @@
                 </div>
 
                 <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
-                    <x-nav-link :href="route('ordenes.index')" :active="request()->routeIs('ordenes.*')">
+                <div class="hidden space-x-6 sm:-my-px sm:ms-10 sm:flex sm:items-center">
+                    <x-nav-link :href="route('ordenes.index')" :active="request()->routeIs('ordenes.index') || request()->routeIs('ordenes.show') || request()->routeIs('ordenes.create')">
                         Órdenes
                     </x-nav-link>
-                    @role('tecnico|administrador')
-                    <x-nav-link :href="route('clientes.index')" :active="request()->routeIs('clientes.*')">
-                        Clientes
-                    </x-nav-link>
-                    <x-nav-link :href="route('equipos.index')" :active="request()->routeIs('equipos.*')">
-                        Equipos
-                    </x-nav-link>
-                    @endrole
+
+                    @if (auth()->user()->hasRole('administrador'))
+                        <x-nav-dropdown title="Clientes y Empresas"
+                            :active="request()->routeIs('clientes.*') || request()->routeIs('empresas.*')">
+                            <x-dropdown-link :href="route('clientes.create')">+ Nuevo cliente</x-dropdown-link>
+                            <x-dropdown-link :href="route('clientes.index')">Ver clientes</x-dropdown-link>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <x-dropdown-link :href="route('empresas.create')">+ Nueva empresa</x-dropdown-link>
+                            <x-dropdown-link :href="route('empresas.index')">Ver empresas</x-dropdown-link>
+                        </x-nav-dropdown>
+
+                        <x-nav-dropdown title="Equipos"
+                            :active="request()->routeIs('equipos.*') || request()->routeIs('admin.tipos-equipos.*')">
+                            <x-dropdown-link :href="route('equipos.create')">+ Nuevo equipo</x-dropdown-link>
+                            <x-dropdown-link :href="route('equipos.index')">Ver equipos</x-dropdown-link>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <x-dropdown-link :href="route('admin.tipos-equipos.index')">Tipos de equipo</x-dropdown-link>
+                        </x-nav-dropdown>
+
+                        <x-nav-dropdown title="Búsqueda"
+                            :active="request()->routeIs('ordenes.buscar') || request()->routeIs('ordenes.mias')">
+                            <x-dropdown-link :href="route('ordenes.buscar')">Búsqueda avanzada</x-dropdown-link>
+                            <x-dropdown-link :href="route('ordenes.mias')">Mis órdenes asignadas</x-dropdown-link>
+                            <x-dropdown-link :href="route('ordenes.index')">Ver todas las órdenes</x-dropdown-link>
+                        </x-nav-dropdown>
+                    @elseif (auth()->user()->hasRole('tecnico'))
+                        <x-nav-link :href="route('ordenes.mias')" :active="request()->routeIs('ordenes.mias')">
+                            Mis órdenes
+                        </x-nav-link>
+
+                        <x-nav-dropdown title="Clientes y Empresas"
+                            :active="request()->routeIs('clientes.*') || request()->routeIs('empresas.*')">
+                            <x-dropdown-link :href="route('clientes.create')">+ Nuevo cliente</x-dropdown-link>
+                            <x-dropdown-link :href="route('clientes.index')">Ver clientes</x-dropdown-link>
+                            <div class="border-t border-gray-100 my-1"></div>
+                            <x-dropdown-link :href="route('empresas.create')">+ Nueva empresa</x-dropdown-link>
+                            <x-dropdown-link :href="route('empresas.index')">Ver empresas</x-dropdown-link>
+                        </x-nav-dropdown>
+
+                        <x-nav-dropdown title="Equipos" :active="request()->routeIs('equipos.*')">
+                            <x-dropdown-link :href="route('equipos.create')">+ Nuevo equipo</x-dropdown-link>
+                            <x-dropdown-link :href="route('equipos.index')">Ver equipos</x-dropdown-link>
+                        </x-nav-dropdown>
+
+                        <x-nav-dropdown title="Búsqueda" :active="request()->routeIs('ordenes.buscar')">
+                            <x-dropdown-link :href="route('ordenes.buscar')">Búsqueda avanzada</x-dropdown-link>
+                            <x-dropdown-link :href="route('ordenes.index')">Ver todas las órdenes</x-dropdown-link>
+                        </x-nav-dropdown>
+                    @endif
                 </div>
             </div>
 
@@ -49,9 +90,6 @@
                         @role('administrador')
                         <x-dropdown-link :href="route('admin.users.index')">
                             Gestión de Usuarios
-                        </x-dropdown-link>
-                        <x-dropdown-link :href="route('admin.tipos-equipos.index')">
-                            Tipos de Equipo
                         </x-dropdown-link>
                         @endrole
 
@@ -84,17 +122,41 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
-            <x-responsive-nav-link :href="route('ordenes.index')" :active="request()->routeIs('ordenes.*')">
+            <x-responsive-nav-link :href="route('ordenes.index')" :active="request()->routeIs('ordenes.index')">
                 Órdenes
             </x-responsive-nav-link>
-            @role('tecnico|administrador')
-            <x-responsive-nav-link :href="route('clientes.index')" :active="request()->routeIs('clientes.*')">
-                Clientes
-            </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('equipos.index')" :active="request()->routeIs('equipos.*')">
-                Equipos
-            </x-responsive-nav-link>
-            @endrole
+
+            @if (auth()->user()->hasRole('administrador'))
+                <div class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Clientes y Empresas</div>
+                <x-responsive-nav-link :href="route('clientes.create')">+ Nuevo cliente</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('clientes.index')" :active="request()->routeIs('clientes.index')">Ver clientes</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('empresas.create')">+ Nueva empresa</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('empresas.index')" :active="request()->routeIs('empresas.index')">Ver empresas</x-responsive-nav-link>
+
+                <div class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Equipos</div>
+                <x-responsive-nav-link :href="route('equipos.create')">+ Nuevo equipo</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('equipos.index')" :active="request()->routeIs('equipos.index')">Ver equipos</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.tipos-equipos.index')" :active="request()->routeIs('admin.tipos-equipos.*')">Tipos de equipo</x-responsive-nav-link>
+
+                <div class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Búsqueda</div>
+                <x-responsive-nav-link :href="route('ordenes.buscar')" :active="request()->routeIs('ordenes.buscar')">Búsqueda avanzada</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('ordenes.mias')" :active="request()->routeIs('ordenes.mias')">Mis órdenes asignadas</x-responsive-nav-link>
+            @elseif (auth()->user()->hasRole('tecnico'))
+                <x-responsive-nav-link :href="route('ordenes.mias')" :active="request()->routeIs('ordenes.mias')">Mis órdenes</x-responsive-nav-link>
+
+                <div class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Clientes y Empresas</div>
+                <x-responsive-nav-link :href="route('clientes.create')">+ Nuevo cliente</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('clientes.index')" :active="request()->routeIs('clientes.index')">Ver clientes</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('empresas.create')">+ Nueva empresa</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('empresas.index')" :active="request()->routeIs('empresas.index')">Ver empresas</x-responsive-nav-link>
+
+                <div class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Equipos</div>
+                <x-responsive-nav-link :href="route('equipos.create')">+ Nuevo equipo</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('equipos.index')" :active="request()->routeIs('equipos.index')">Ver equipos</x-responsive-nav-link>
+
+                <div class="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase">Búsqueda</div>
+                <x-responsive-nav-link :href="route('ordenes.buscar')" :active="request()->routeIs('ordenes.buscar')">Búsqueda avanzada</x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->
@@ -112,9 +174,6 @@
                 @role('administrador')
                 <x-responsive-nav-link :href="route('admin.users.index')">
                     Gestión de Usuarios
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.tipos-equipos.index')">
-                    Tipos de Equipo
                 </x-responsive-nav-link>
                 @endrole
 

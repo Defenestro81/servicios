@@ -18,29 +18,132 @@ class OrdenController extends Controller
 {
     public function index(Request $request): View
     {
+        $base = $this->queryBase($request);
+
+        $pendientes = (clone $base)
+            ->whereNull('fecha_retirado')
+            ->orderByDesc('fecha_ingreso')
+            ->get();
+
+        $finalizados = (clone $base)
+            ->whereNotNull('fecha_retirado')
+            ->orderByDesc('fecha_retirado')
+            ->paginate(15, ['*'], 'finalizados')
+            ->withQueryString();
+
+        $estados = Estado::orderBy('orden')->get();
+
+        return view('ordenes.index', compact('pendientes', 'finalizados', 'estados'));
+    }
+
+    public function mias(Request $request): View
+    {
+        $base = $this->queryBase($request)
+            ->whereHas('tecnicos', fn($t) => $t->where('users.id', auth()->id()));
+
+        $pendientes = (clone $base)
+            ->whereNull('fecha_retirado')
+            ->orderByDesc('fecha_ingreso')
+            ->get();
+
+        $finalizados = (clone $base)
+            ->whereNotNull('fecha_retirado')
+            ->orderByDesc('fecha_retirado')
+            ->paginate(15, ['*'], 'finalizados')
+            ->withQueryString();
+
+        $estados = Estado::orderBy('orden')->get();
+
+        return view('ordenes.mias', compact('pendientes', 'finalizados', 'estados'));
+    }
+
+    public function buscar(Request $request): View
+    {
+        $base = $this->queryBase($request);
+
+        $entrega = $request->get('entrega', 'todos');
+
+        $pendientes  = collect();
+        $finalizados = collect();
+
+        if (in_array($entrega, ['todos', 'pendientes'])) {
+            $pendientes = (clone $base)
+                ->whereNull('fecha_retirado')
+                ->orderByDesc('fecha_ingreso')
+                ->get();
+        }
+
+        if (in_array($entrega, ['todos', 'finalizados'])) {
+            $finalizados = (clone $base)
+                ->whereNotNull('fecha_retirado')
+                ->orderByDesc('fecha_retirado')
+                ->get();
+        }
+
+        $estados  = Estado::orderBy('orden')->get();
+        $tecnicos = User::role(['tecnico', 'administrador'])->orderBy('name')->get();
+        $busco    = $request->hasAny(['q', 'apellido', 'nombre', 'empresa', 'etiqueta', 'nro_serie', 'estado_id', 'tecnico_id', 'fecha_desde', 'fecha_hasta', 'entrega']);
+
+        return view('ordenes.buscar', compact('pendientes', 'finalizados', 'estados', 'tecnicos', 'busco'));
+    }
+
+    /**
+     * Arma la consulta base de órdenes aplicando el alcance por rol y todos
+     * los filtros de búsqueda (rápida y avanzada) presentes en el request.
+     */
+    private function queryBase(Request $request)
+    {
         $user = auth()->user();
 
-        $query = Orden::with(['cliente', 'equipo.tipo', 'estado', 'tecnicoPrincipal'])
-            ->orderBy('id', 'desc');
+        $query = Orden::with(['cliente.empresa', 'equipo.tipo', 'estado', 'tecnicoPrincipal']);
 
+        // El rol "usuario" sólo ve las órdenes de clientes con su mismo email.
         if ($user->hasRole('usuario')) {
             $query->whereHas('cliente', fn($q) => $q->where('email', $user->email));
         }
 
+        // Búsqueda rápida: apellido, nombre, empresa del cliente o etiqueta del equipo.
+        if ($request->filled('q')) {
+            $q = $request->q;
+            $query->where(function ($w) use ($q) {
+                $w->whereHas('cliente', function ($c) use ($q) {
+                    $c->where('apellido', 'like', "%{$q}%")
+                        ->orWhere('nombre', 'like', "%{$q}%")
+                        ->orWhereHas('empresa', fn($e) => $e->where('nombre', 'like', "%{$q}%"));
+                })->orWhereHas('equipo', fn($e) => $e->where('etiqueta', 'like', "%{$q}%"));
+            });
+        }
+
+        // Filtros avanzados (cada uno opcional).
+        if ($request->filled('apellido')) {
+            $query->whereHas('cliente', fn($c) => $c->where('apellido', 'like', "%{$request->apellido}%"));
+        }
+        if ($request->filled('nombre')) {
+            $query->whereHas('cliente', fn($c) => $c->where('nombre', 'like', "%{$request->nombre}%"));
+        }
+        if ($request->filled('empresa')) {
+            $query->whereHas('cliente.empresa', fn($e) => $e->where('nombre', 'like', "%{$request->empresa}%"));
+        }
+        if ($request->filled('etiqueta')) {
+            $query->whereHas('equipo', fn($e) => $e->where('etiqueta', 'like', "%{$request->etiqueta}%"));
+        }
+        if ($request->filled('nro_serie')) {
+            $query->whereHas('equipo', fn($e) => $e->where('nro_serie', 'like', "%{$request->nro_serie}%"));
+        }
         if ($request->filled('estado_id')) {
             $query->where('estado_id', $request->estado_id);
         }
-
-        if ($request->filled('q')) {
-            $q = $request->q;
-            $query->whereHas('cliente', fn($s) => $s->where('apellido', 'like', "%{$q}%")->orWhere('nombre', 'like', "%{$q}%"))
-                ->orWhereHas('equipo', fn($s) => $s->where('etiqueta', 'like', "%{$q}%")->orWhere('marca', 'like', "%{$q}%"));
+        if ($request->filled('tecnico_id')) {
+            $query->whereHas('tecnicos', fn($t) => $t->where('users.id', $request->tecnico_id));
+        }
+        if ($request->filled('fecha_desde')) {
+            $query->whereDate('fecha_ingreso', '>=', $request->fecha_desde);
+        }
+        if ($request->filled('fecha_hasta')) {
+            $query->whereDate('fecha_ingreso', '<=', $request->fecha_hasta);
         }
 
-        $ordenes = $query->paginate(25)->withQueryString();
-        $estados = Estado::orderBy('orden')->get();
-
-        return view('ordenes.index', compact('ordenes', 'estados'));
+        return $query;
     }
 
     public function create(): View
@@ -146,6 +249,15 @@ class OrdenController extends Controller
 
     public function show(Orden $orden): View
     {
+        $user = auth()->user();
+
+        // El rol "usuario" sólo puede ver órdenes de clientes con su mismo email.
+        abort_if(
+            $user->hasRole('usuario') && $orden->cliente->email !== $user->email,
+            403,
+            'No tenés acceso a esta orden.'
+        );
+
         $orden->load([
             'cliente', 'equipo.tipo', 'estado',
             'tecnicos', 'tecnicoPrincipal',
@@ -159,7 +271,29 @@ class OrdenController extends Controller
         $proveedores = \App\Models\Proveedor::orderBy('nombre')->get();
         $puedeEditar = $orden->puedeEditarTecnico(auth()->user());
 
-        return view('ordenes.show', compact('orden', 'tecnicos', 'estados', 'proveedores', 'puedeEditar'));
+        // Antecedentes (solo para técnico/admin): otras órdenes del mismo equipo
+        // —incluyendo las que trajeron otros clientes— y otras del mismo cliente.
+        $ordenesEquipo  = collect();
+        $ordenesCliente = collect();
+
+        if ($user->hasRole(['tecnico', 'administrador'])) {
+            $ordenesEquipo = Orden::with(['cliente', 'estado'])
+                ->where('equipo_id', $orden->equipo_id)
+                ->whereKeyNot($orden->id)
+                ->orderByDesc('fecha_ingreso')
+                ->get();
+
+            $ordenesCliente = Orden::with(['equipo.tipo', 'estado'])
+                ->where('cliente_id', $orden->cliente_id)
+                ->whereKeyNot($orden->id)
+                ->orderByDesc('fecha_ingreso')
+                ->get();
+        }
+
+        return view('ordenes.show', compact(
+            'orden', 'tecnicos', 'estados', 'proveedores', 'puedeEditar',
+            'ordenesEquipo', 'ordenesCliente'
+        ));
     }
 
     public function edit(Orden $orden): View
@@ -180,11 +314,15 @@ class OrdenController extends Controller
             'trabajo_realizado'  => ['nullable', 'string'],
             'accesorios'         => ['nullable', 'string'],
             'detalles'           => ['nullable', 'string'],
+            'costo_mano_obra'    => ['nullable', 'numeric', 'min:0'],
+            'costo_repuestos'    => ['nullable', 'numeric', 'min:0'],
             'fecha_terminado'    => ['nullable', 'date'],
             'fecha_retirado'     => ['nullable', 'date'],
         ]);
 
-        $data['updated_by'] = auth()->id();
+        $data['costo_mano_obra'] = $data['costo_mano_obra'] ?? 0;
+        $data['costo_repuestos'] = $data['costo_repuestos'] ?? 0;
+        $data['updated_by']      = auth()->id();
         $orden->update($data);
 
         return redirect()->route('ordenes.show', $orden)
@@ -200,14 +338,26 @@ class OrdenController extends Controller
             'nota'      => ['nullable', 'string', 'max:500'],
         ]);
 
-        $orden->update([
-            'estado_id'  => $request->estado_id,
+        $estado = Estado::findOrFail($request->estado_id);
+
+        $cambios = [
+            'estado_id'  => $estado->id,
             'updated_by' => auth()->id(),
-        ]);
+        ];
+
+        // Registro automático de fechas según el estado al que se pasa.
+        if ($estado->nombre === 'Listo' && !$orden->fecha_terminado) {
+            $cambios['fecha_terminado'] = now();
+        }
+        if ($estado->nombre === 'Entregado' && !$orden->fecha_retirado) {
+            $cambios['fecha_retirado'] = now();
+        }
+
+        $orden->update($cambios);
 
         OrdenEstadoHistorial::create([
             'orden_id'  => $orden->id,
-            'estado_id' => $request->estado_id,
+            'estado_id' => $estado->id,
             'user_id'   => auth()->id(),
             'nota'      => $request->nota,
         ]);

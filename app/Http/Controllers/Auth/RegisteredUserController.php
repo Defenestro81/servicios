@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Spatie\Permission\Models\Role;
 
 class RegisteredUserController extends Controller
 {
@@ -42,6 +43,9 @@ class RegisteredUserController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
+        // El rol "usuario" es el rol base del portal; lo garantizamos para que
+        // el alta nunca falle aunque el entorno no se haya seedeado.
+        Role::firstOrCreate(['name' => 'usuario', 'guard_name' => 'web']);
         $user->assignRole('usuario');
 
         event(new Registered($user));

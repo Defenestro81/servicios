@@ -76,7 +76,9 @@ class ProfileTest extends TestCase
             ->assertRedirect('/');
 
         $this->assertGuest();
-        $this->assertNull($user->fresh());
+        // El usuario usa SoftDeletes para preservar las relaciones de auditoría,
+        // por lo que el registro queda marcado como eliminado, no borrado físicamente.
+        $this->assertSoftDeleted($user);
     }
 
     public function test_correct_password_must_be_provided_to_delete_account(): void

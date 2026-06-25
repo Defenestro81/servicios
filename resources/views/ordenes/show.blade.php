@@ -32,17 +32,25 @@
                     <div>
                         <dt class="text-gray-500 font-medium">Cliente</dt>
                         <dd class="mt-1">
-                            <a href="{{ route('clientes.show', $orden->cliente) }}" class="text-indigo-600 hover:text-indigo-800 font-medium">
-                                {{ $orden->cliente->nombre_completo }}
-                            </a>
+                            @role('tecnico|administrador')
+                                <a href="{{ route('clientes.show', $orden->cliente) }}" class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                    {{ $orden->cliente->nombre_completo }}
+                                </a>
+                            @else
+                                <span class="text-gray-900 font-medium">{{ $orden->cliente->nombre_completo }}</span>
+                            @endrole
                         </dd>
                     </div>
                     <div>
                         <dt class="text-gray-500 font-medium">Equipo</dt>
                         <dd class="mt-1">
-                            <a href="{{ route('equipos.show', $orden->equipo) }}" class="text-indigo-600 hover:text-indigo-800">
-                                {{ $orden->equipo->etiqueta }}
-                            </a>
+                            @role('tecnico|administrador')
+                                <a href="{{ route('equipos.show', $orden->equipo) }}" class="text-indigo-600 hover:text-indigo-800">
+                                    {{ $orden->equipo->etiqueta }}
+                                </a>
+                            @else
+                                <span class="text-gray-900 font-mono">{{ $orden->equipo->etiqueta }}</span>
+                            @endrole
                             <span class="text-gray-600 ml-1">{{ $orden->equipo->descripcion }}</span>
                         </dd>
                     </div>
@@ -102,6 +110,33 @@
                     @endif
                 </div>
             </div>
+
+            <!-- Costos -->
+            @role('tecnico|administrador')
+            <div class="bg-white shadow-sm sm:rounded-lg p-6">
+                <div class="grid grid-cols-3 gap-6 text-sm">
+                    <div>
+                        <dt class="text-gray-500 font-medium">Mano de obra</dt>
+                        <dd class="mt-1 text-gray-900">${{ number_format((float) $orden->costo_mano_obra, 2, ',', '.') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 font-medium">Repuestos</dt>
+                        <dd class="mt-1 text-gray-900">${{ number_format((float) $orden->costo_repuestos, 2, ',', '.') }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500 font-medium">Total</dt>
+                        <dd class="mt-1 text-lg font-semibold text-indigo-700">${{ number_format($orden->costo_total, 2, ',', '.') }}</dd>
+                    </div>
+                </div>
+            </div>
+            @else
+                @if($orden->costo_total > 0)
+                <div class="bg-white shadow-sm sm:rounded-lg p-6 flex items-center justify-between text-sm">
+                    <dt class="text-gray-500 font-medium">Total a abonar</dt>
+                    <dd class="text-lg font-semibold text-indigo-700">${{ number_format($orden->costo_total, 2, ',', '.') }}</dd>
+                </div>
+                @endif
+            @endrole
 
             <!-- Cambiar estado -->
             @if($puedeEditar)
@@ -181,7 +216,8 @@
                 </ul>
             </div>
 
-            <!-- Arreglos con terceros -->
+            <!-- Arreglos con terceros (información interna, oculta al cliente) -->
+            @role('tecnico|administrador')
             @if($puedeEditar || $orden->arreglosTerceros->isNotEmpty())
             <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-200">
@@ -266,6 +302,7 @@
                 @endif
             </div>
             @endif
+            @endrole
 
             <!-- Adjuntos -->
             <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
@@ -327,6 +364,85 @@
                 </div>
                 @endif
             </div>
+
+            <!-- Antecedentes (solo técnico/admin) -->
+            @role('tecnico|administrador')
+            <!-- Otras órdenes de este equipo (incluye las de otros clientes) -->
+            <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Otras órdenes de este equipo</h3>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ $ordenesEquipo->count() }}</span>
+                </div>
+                @if($ordenesEquipo->isNotEmpty())
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ingreso</th>
+                            <th class="px-6 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($ordenesEquipo as $o)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-3 font-medium text-gray-900">#{{ $o->id }}</td>
+                            <td class="px-6 py-3 text-gray-700">
+                                {{ $o->cliente->nombre_completo }}
+                                @if($o->cliente_id !== $orden->cliente_id)
+                                    <span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">otro cliente</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-3"><x-estado-badge :estado="$o->estado" /></td>
+                            <td class="px-6 py-3 text-gray-500">{{ $o->fecha_ingreso->format('d/m/Y') }}</td>
+                            <td class="px-6 py-3 text-right"><a href="{{ route('ordenes.show', $o) }}" class="text-indigo-600 hover:text-indigo-800">Ver</a></td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @else
+                <p class="px-6 py-6 text-center text-gray-400 text-sm">Este equipo no tiene otras órdenes registradas.</p>
+                @endif
+            </div>
+
+            <!-- Otras órdenes de este cliente -->
+            <div class="bg-white shadow-sm sm:rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+                    <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Otras órdenes de este cliente</h3>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ $ordenesCliente->count() }}</span>
+                </div>
+                @if($ordenesCliente->isNotEmpty())
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Equipo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ingreso</th>
+                            <th class="px-6 py-3"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($ordenesCliente as $o)
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-3 font-medium text-gray-900">#{{ $o->id }}</td>
+                            <td class="px-6 py-3 text-gray-600">
+                                <span class="font-mono text-xs text-gray-400">{{ $o->equipo->etiqueta }}</span>
+                                <span class="ml-1">{{ $o->equipo->descripcion }}</span>
+                            </td>
+                            <td class="px-6 py-3"><x-estado-badge :estado="$o->estado" /></td>
+                            <td class="px-6 py-3 text-gray-500">{{ $o->fecha_ingreso->format('d/m/Y') }}</td>
+                            <td class="px-6 py-3 text-right"><a href="{{ route('ordenes.show', $o) }}" class="text-indigo-600 hover:text-indigo-800">Ver</a></td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                @else
+                <p class="px-6 py-6 text-center text-gray-400 text-sm">Este cliente no tiene otras órdenes registradas.</p>
+                @endif
+            </div>
+            @endrole
 
         </div>
     </div>

@@ -1,14 +1,15 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ auth()->user()->hasRole('usuario') ? 'Mis órdenes de servicio' : 'Órdenes de Servicio' }}
-            </h2>
-            @role('tecnico|administrador')
-            <a href="{{ route('ordenes.create') }}" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition">
-                + Nueva orden
-            </a>
-            @endrole
+            <h2 class="font-semibold text-xl text-gray-800 leading-tight">Mis órdenes</h2>
+            <div class="flex gap-2">
+                <a href="{{ route('ordenes.index') }}" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-md hover:bg-gray-50 transition">
+                    Ver todas
+                </a>
+                <a href="{{ route('ordenes.create') }}" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 transition">
+                    + Nueva orden
+                </a>
+            </div>
         </div>
     </x-slot>
 
@@ -21,17 +22,6 @@
             @if (session('error'))
                 <div class="mb-4 px-4 py-3 bg-red-100 border border-red-300 text-red-800 rounded-lg text-sm">{{ session('error') }}</div>
             @endif
-
-            @role('usuario')
-                @if ($pendientes->isEmpty() && $finalizados->total() === 0)
-                    <div class="mb-6 px-4 py-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-                        Acá vas a ver el estado de las órdenes asociadas a tu correo
-                        (<span class="font-medium">{{ auth()->user()->email }}</span>).
-                        Si trajiste un equipo y todavía no aparece, avisale al taller que registre tu
-                        dirección de correo en tu ficha de cliente.
-                    </div>
-                @endif
-            @endrole
 
             <!-- Buscador -->
             <form method="GET" class="mb-6 flex flex-wrap gap-2 items-center">
@@ -49,11 +39,8 @@
                 </select>
                 <button type="submit" class="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm hover:bg-gray-200">Buscar</button>
                 @if(request()->hasAny(['q','estado_id']))
-                    <a href="{{ route('ordenes.index') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">Limpiar</a>
+                    <a href="{{ route('ordenes.mias') }}" class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700">Limpiar</a>
                 @endif
-                @role('tecnico|administrador')
-                    <a href="{{ route('ordenes.buscar') }}" class="px-3 py-2 text-sm text-indigo-600 hover:text-indigo-800">Búsqueda avanzada →</a>
-                @endrole
             </form>
 
             <!-- PENDIENTES -->
@@ -64,7 +51,7 @@
                         {{ $pendientes->count() }}
                     </span>
                 </div>
-                @include('ordenes._tabla', ['ordenes' => $pendientes, 'vacio' => 'No hay órdenes pendientes.'])
+                @include('ordenes._tabla', ['ordenes' => $pendientes, 'vacio' => 'No tenés órdenes pendientes asignadas.'])
             </section>
 
             <!-- FINALIZADAS -->
@@ -75,7 +62,7 @@
                         {{ $finalizados->total() }}
                     </span>
                 </div>
-                @include('ordenes._tabla', ['ordenes' => $finalizados, 'vacio' => 'No hay órdenes finalizadas.'])
+                @include('ordenes._tabla', ['ordenes' => $finalizados, 'vacio' => 'No tenés órdenes finalizadas.'])
                 <div class="mt-4">{{ $finalizados->links() }}</div>
             </section>
 
